@@ -1,0 +1,56 @@
+environment {
+    GIT_BRANCH = "feature/${UUID.randomUUID().toString()}"
+    DOCKERHUB_USERNAME = 'Famien05'
+    DOCKERHUB_PASSWORD = '0505Famien'
+}
+
+stages {
+    stage('Checkout') {
+        steps {
+            bat 'git fetch origin'
+            bat "git checkout -b ${GIT_BRANCH}"
+            bat "git push origin ${GIT_BRANCH}"
+            bat "git status"
+        }
+    }
+
+    stage('Build and Test') {
+        when {
+            branch 'dev'
+        }
+        steps {
+            bat "pip install -r requirements.txt"
+            bat "python -m unittest"
+        }
+    }
+
+    stage('Build and Push Docker Images') {
+        steps {
+            bat 'docker-compose build'
+            withCredentials([usernamePassword(credentialsId: 'dockerhub_credentials', usernameVariable: 'DOCKERHUB_USERNAME', passwordVariable: 'DOCKERHUB_PASSWORD')]) {
+                bat 'docker login -u $DOCKERHUB_USERNAME -p $DOCKERHUB_PASSWORD'
+            }
+            bat 'docker-compose push'
+        }
+    }
+
+    stage('Merge') {
+        steps {
+            bat "git fetch"
+            bat "git branch"
+            bat "git checkout main"
+            bat "git pull origin HEAD:main"
+            bat "git merge ${GIT_BRANCH}"
+            bat "git push origin main"
+        }
+    }
+}
+
+post {
+    always {
+        bat "git fetch"
+        bat "git checkout main"
+        bat "git branch -D ${GIT_BRANCH}"
+        bat "git push origin --delete ${GIT_BRANCH}"
+    }
+}
